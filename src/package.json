@@ -1,9 +1,10 @@
 {
-  "main": "index.html",
-  "name": "Hello NW.js",
-  "window": {
-    "fullscreen": true
-    //        ,"toolbar": false
-    //这个选项对于开发太重要了
-  }
+    "main": "index.html",
+    "name": "Hello NW.js",
+    "window": {
+        "resizable" : true,
+//        "fullscreen": true,
+        "toolbar": true
+        //这个选项对于开发太重要了
+    }
 }
