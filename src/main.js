@@ -3,14 +3,7 @@ var fn = require('./nativeFn');
 var async = require('../lib/async');
 const path = require('path');
 
-function main(changeImg, basePath) {
-
-
-    var imgChangeInterval = 2 * 1000;
-
-    if (basePath == undefined) {
-        basePath = 'D:/abc/download/t/python files working/out';
-    }
+function main(changeImg, paths) {
 
     var mainImgIndex = 1;
 
@@ -20,10 +13,16 @@ function main(changeImg, basePath) {
         }
     }
 
-    var paths = fn.acquireMainShuffledPaths(basePath);
+    savedObj.nextIndex = 0;
 
     //展示幻灯片代码
     async.mapLimit(paths, 1, function (ele, callback) {
+
+        callbackT = function (err, ele) {
+            savedObj.nextIndex++;
+            callback(err, ele);
+        }
+
 
         var imgs = fn.acquireFilePaths(ele.fullPath);
 
@@ -41,9 +40,14 @@ function main(changeImg, basePath) {
 
         async.mapLimit(imgs, 1, function (img, callbackImg) {
 
+            if (commondParam.showNextFolder) {
+                commondParam.showNextFolder = false;
+                //here may realized by exception
+                callbackImg('showNextFolder', 'showNextFolder');
+            }
+
             if (!running) {
                 callbackImg("stop");
-                return;
             }
 
             if (img.name.indexOf('.jpg') == -1) {
@@ -60,11 +64,15 @@ function main(changeImg, basePath) {
 
         }, function (err, result) {
 
-            if (err) {
-                callback(err);
+            if (err == 'showNextFolder'){
+                callbackT(null, {
+                    imgs: JSON.stringify(result),
+                    folder: ele.name
+                });
+                return ;
             }
 
-            callback(err, {
+            callbackT(err, {
                 imgs: JSON.stringify(result),
                 folder: ele.name
             });
@@ -75,15 +83,63 @@ function main(changeImg, basePath) {
     });
 }
 
+var imgChangeInterval = 2 * 1000;
+
+var commondParam = {
+
+    showNextFolder: false
+
+}
+
 var basePath = 'D:/abc/download/t/python files working/out';
 
+var savedObj = {
+    basePath: '',
+    paths: [],
+    nextIndex: 0
+}
+
 //main(undefined,basePath);
+
+// Listen to main window's close event
+nw.Window.get().on('resize', function (width, height) {
+
+    if (width < height) {
+        $('#imgShower').removeAttr('height');
+        $('#imgShower').attr('width', width);
+        return;
+    }
+
+    $('#imgShower').removeAttr('width');
+    $('#imgShower').attr('height', height - 50);
+});
+
+
+(function () {
+    var option = {
+        key: "Escape",
+        active: function () {
+            nw.Window.get().toggleFullscreen();
+        },
+        failed: function (msg) {
+            console.log(msg);
+        }
+    };
+
+    // Create a shortcut with |option|.
+    var shortcut = new nw.Shortcut(option);
+
+    // Register global desktop shortcut, which can work without focus.
+    nw.App.registerGlobalHotKey(shortcut);
+
+
+})();
 
 
 $(function () {
 
     //change the path to use
-    //var basePath = 'D:/abc/download/t/python files working/out';
+    var basePath = 'D:/abc/download/t/python files working/out';
 
     $('#showBtn').click(function () {
 
@@ -95,13 +151,17 @@ $(function () {
             basePath = inputBasePath;
         }
 
+        var paths = fn.acquireMainShuffledPaths(basePath);
+
+        savedObj.basePath = basePath;
+        savedObj.paths = paths;
 
         main(function (img, text) {
 
             $('#imgText').text(text);
             $('#imgShower').attr('src', img);
 
-        }, basePath);
+        }, paths);
     });
 
     $('#stopBtn').click(function () {
@@ -109,5 +169,22 @@ $(function () {
         running = false;
 
     });
+
+    $('#intervalSelect').change(function (event) {
+        imgChangeInterval = $(this).val() * 1000;
+    });
+
+    $('#fullScreenBtn').click(function () {
+        nw.Window.get().enterFullscreen();
+    });
+
+    $('#showNextFolderBtn').click(function () {
+
+        commondParam.showNextFolder = true;
+
+    });
+
+    $('#imgShower').attr('height', nw.Window.get().height);
+
 
 });
