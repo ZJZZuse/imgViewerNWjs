@@ -2,6 +2,7 @@ var running = false;
 var fn = require('./nativeFn');
 var async = require('../lib/async');
 const path = require('path');
+const storeUtil = require('../lib/myLib/storeUtil');
 
 function main(changeImg, paths) {
 
@@ -13,13 +14,11 @@ function main(changeImg, paths) {
         }
     }
 
-    savedObj.nextIndex = 0;
-
     //展示幻灯片代码
     async.mapLimit(paths, 1, function (ele, callback) {
 
         callbackT = function (err, ele) {
-            savedObj.nextIndex++;
+            savedObj.viewedSubs.push(ele.name);
             callback(err, ele);
         }
 
@@ -64,18 +63,18 @@ function main(changeImg, paths) {
 
         }, function (err, result) {
 
-            if (err == 'showNextFolder'){
-                callbackT(null, {
-                    imgs: JSON.stringify(result),
-                    folder: ele.name
-                });
-                return ;
+            var backObj = {
+                imgs: JSON.stringify(result),
+                name: ele.name
+            };
+
+            if (err == 'showNextFolder') {
+
+                callbackT(null, backObj);
+                return;
             }
 
-            callbackT(err, {
-                imgs: JSON.stringify(result),
-                folder: ele.name
-            });
+            callbackT(err, backObj);
         })
 
     }, function (err, result) {
@@ -86,34 +85,13 @@ function main(changeImg, paths) {
 var imgChangeInterval = 2 * 1000;
 
 var commondParam = {
-
     showNextFolder: false
-
-}
-
-var basePath = 'D:/abc/download/t/python files working/out';
+};
 
 var savedObj = {
-    basePath: '',
-    paths: [],
-    nextIndex: 0
-}
-
-//main(undefined,basePath);
-
-// Listen to main window's close event
-nw.Window.get().on('resize', function (width, height) {
-
-    if (width < height) {
-        $('#imgShower').removeAttr('height');
-        $('#imgShower').attr('width', width);
-        return;
-    }
-
-    $('#imgShower').removeAttr('width');
-    $('#imgShower').attr('height', height - 50);
-});
-
+    viewedSubs: [],
+    basePath: ''
+};
 
 (function () {
     var option = {
@@ -132,13 +110,33 @@ nw.Window.get().on('resize', function (width, height) {
     // Register global desktop shortcut, which can work without focus.
     nw.App.registerGlobalHotKey(shortcut);
 
+    nw.Window.get().on('closed', function () {
+        storeUtil.save(savedObj.basePath, savedObj);
+    });
+
+    nw.Window.get().on('loaded', function () {
+        setImgShower(this.width, this.height);
+    });
+
+    function setImgShower(width, height) {
+        if (width < height) {
+            $('#imgShower').removeAttr('height');
+            $('#imgShower').attr('width', width);
+            return;
+        }
+        $('#imgShower').removeAttr('width');
+        $('#imgShower').attr('height', height - 50);
+    }
+
+    nw.Window.get().on('resize', function (width, height) {
+        setImgShower(width, height);
+    });
 
 })();
 
 
 $(function () {
 
-    //change the path to use
     var basePath = 'D:/abc/download/t/python files working/out';
 
     $('#showBtn').click(function () {
@@ -151,17 +149,34 @@ $(function () {
             basePath = inputBasePath;
         }
 
+        savedObj = storeUtil.acquire(basePath, {
+            viewedSubs: [],
+            basePath: basePath
+        });
+
         var paths = fn.acquireMainShuffledPaths(basePath);
 
-        savedObj.basePath = basePath;
-        savedObj.paths = paths;
+        var pathsToDo = [];
+
+        paths.forEach(function (ele, index) {
+
+            //已经处理的就结束
+            for (var i = 1; i < savedObj.viewedSubs.length; i++) {
+                if (ele.name == savedObj.viewedSubs[i]) {
+                    return;
+                }
+            }
+
+            pathsToDo.push(ele);
+
+        });
 
         main(function (img, text) {
 
             $('#imgText').text(text);
             $('#imgShower').attr('src', img);
 
-        }, paths);
+        }, pathsToDo);
     });
 
     $('#stopBtn').click(function () {
