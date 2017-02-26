@@ -19,6 +19,7 @@ function main(changeImg, paths) {
 
         callbackT = function (err, ele) {
             savedObj.viewedSubs.push(ele.name);
+            saveImgViewingState();
             callback(err, ele);
         }
 
@@ -43,10 +44,12 @@ function main(changeImg, paths) {
                 commondParam.showNextFolder = false;
                 //here may realized by exception
                 callbackImg('showNextFolder', 'showNextFolder');
+                return;
             }
 
             if (!running) {
                 callbackImg("stop");
+                return;
             }
 
             if (img.name.indexOf('.jpg') == -1) {
@@ -93,6 +96,13 @@ var savedObj = {
     basePath: ''
 };
 
+function saveImgViewingState(){
+    if (savedObj.basePath == '') {
+        return;
+    }
+    storeUtil.save(savedObj.basePath, savedObj);
+}
+
 (function () {
     var option = {
         key: "Escape",
@@ -110,8 +120,10 @@ var savedObj = {
     // Register global desktop shortcut, which can work without focus.
     nw.App.registerGlobalHotKey(shortcut);
 
+
+
     nw.Window.get().on('closed', function () {
-        storeUtil.save(savedObj.basePath, savedObj);
+        saveImgViewingState();
     });
 
     nw.Window.get().on('loaded', function () {
@@ -119,13 +131,14 @@ var savedObj = {
     });
 
     function setImgShower(width, height) {
+
         if (width < height) {
             $('#imgShower').removeAttr('height');
             $('#imgShower').attr('width', width);
             return;
         }
         $('#imgShower').removeAttr('width');
-        $('#imgShower').attr('height', height - 50);
+        $('#imgShower').attr('height', height - 150);
     }
 
     nw.Window.get().on('resize', function (width, height) {
@@ -182,6 +195,7 @@ $(function () {
     $('#stopBtn').click(function () {
 
         running = false;
+        saveImgViewingState();
 
     });
 
